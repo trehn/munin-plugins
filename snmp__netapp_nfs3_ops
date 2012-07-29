@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+# 
+### LICENSE
+#
+# Copyright (c) 2012, Torsten Rehn <torsten@rehn.tel>
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above 
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# 
+### USAGE
+#
+# ln -s /usr/.../snmp__netapp_nfs3_ops /etc/munin/plugins/snmp_10.11.12.13_netapp_nfs3_ops
+#
+# vi /etc/munin/munin.conf
+# 	[netapp.example.com]
+# 		address 127.0.0.1
+# 		host_name netapp.example.com
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# 	[snmp_10.11.12.13_*]
+# 	host_name netapp.example.com
+# 	user root
+# 	env.community public
+#
+#%# family=auto
+#%# capabilities=autoconf
+
+from os import environ
+from re import match
+from subprocess import check_output
+from sys import argv, exit
+
+OPS = (
+	"NULL",
+	"GETATTR",
+	"SETATTR",
+	"LOOKUP",
+	"ACCESS",
+	"READLINK",
+	"READ",
+	"WRITE",
+	"CREATE",
+	"MKDIR",
+	"SYMLINK",
+	"MKNOD",
+	"REMOVE",
+	"RMDIR",
+	"RENAME",
+	"LINK",
+	"READDIR",
+	"READDIRPLUS",
+	"FSSTAT",
+	"FSINFO",
+	"PATHCONF",
+	"COMMIT"
+)
+
+community = environ.get("community", "public")
+host = match(r"(.*)snmp_(?P<host>[^_]*)_(.*)", argv[0]).groupdict()["host"]
+
+config = (len(argv) == 2 and argv[1] == "config")
+
+def snmpget(*args):
+	oid = ".".join(args)
+	return check_output("snmpget -Oqv -v 2c -c {0} {1} {2}".format(community, host, oid), shell = True).strip()
+
+if len(argv) == 2 and argv[1] == "autoconfig":
+	print("yes")
+	exit(0)
+elif config:
+	print("host_name " + host)
+
+oid_prefix = "1.3.6.1.4.1.789.1.3.2.2.4.1"
+
+if config:
+	print("graph_title NFSv3 operations by type")
+	print("graph_args --base 1000 --slope-mode")
+	print("graph_vlabel operations/s")
+	print("graph_category network")
+	for op in OPS:
+		print(op + ".label " + op)
+		print(op + ".type COUNTER")
+		print(op + ".draw AREASTACK")
+else:
+	for i in range(len(OPS)):
+		op = OPS[i]
+		opcount = snmpget(oid_prefix, str(i+1), "0")
+		print(op + ".value " + opcount)
