@@ -18,7 +18,7 @@
 # 
 ### USAGE
 #
-# ln -s /usr/.../snmp__netapp_temp /etc/munin/plugins/snmp_10.11.12.13_netapp_temp
+# ln -s /usr/.../snmp__netapp_fans /etc/munin/plugins/snmp_10.11.12.13_netapp_fans
 #
 # vi /etc/munin/munin.conf
 # 	[netapp.example.com]
