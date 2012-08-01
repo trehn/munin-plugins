@@ -1,0 +1,108 @@
+#!/usr/bin/env python
+# 
+### LICENSE
+#
+# Copyright (c) 2012, Torsten Rehn <torsten@rehn.tel>
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above 
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# 
+### USAGE
+#
+# ln -s /usr/.../snmp__netapp_temp /etc/munin/plugins/snmp_10.11.12.13_netapp_temp
+#
+# vi /etc/munin/munin.conf
+# 	[netapp.example.com]
+# 		address 127.0.0.1
+# 		host_name netapp.example.com
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# 	[snmp_10.11.12.13_*]
+# 	host_name netapp.example.com
+# 	user root
+# 	env.community public
+# 	env.unit C
+# 	#env.unit F
+#
+#%# family=auto
+#%# capabilities=autoconf
+
+from os import environ
+from re import match
+from subprocess import check_output
+from sys import argv, exit
+
+unit = environ.get("unit", "C")
+community = environ.get("community", "public")
+host = match(r"(.*)snmp_(?P<host>[^_]*)_(.*)", argv[0]).groupdict()["host"]
+
+config = (len(argv) == 2 and argv[1] == "config")
+
+def snmpget(*args):
+	oid = ".".join(args)
+	return check_output(
+		"snmpget -Oqv -v 2c -c {0} {1} {2}".format(
+			community,
+			host,
+			oid
+		),
+		shell = True
+	).strip().strip("\"")
+
+def parse_temp(input_string):
+	temps = input_string.split(",")
+	temps = [t.strip() for t in temps]
+	if unit == "F":
+		temps = [t.split()[1].rstrip(")").lstrip("(").rstrip("F") for t in temps]
+	else:
+		temps = [t.split()[0].rstrip("C") for t in temps]
+	return map(int, temps)
+
+if len(argv) == 2 and argv[1] == "autoconfig":
+	print("yes")
+	exit(0)
+elif config:
+	print("host_name " + host)
+
+enc_ids = check_output(
+	"snmpwalk -Oqv -v 2c -c {0} {1} 1.3.6.1.4.1.789.1.21.1.2.1.1".format(
+		community,
+		host
+	),
+	shell = True
+).strip().split("\n")
+
+for enc_id in enc_ids:
+	oid_prefix = "1.3.6.1.4.1.789.1.21.1.2.1.25"
+
+	temps = parse_temp(snmpget(oid_prefix, enc_id))
+
+	print("multigraph temp_" + enc_id)
+	if config:
+		print("graph_title temperature for enclosure " + enc_id)
+		print("graph_args --slope-mode")
+		if unit == "F":
+			print("graph_vlabel degrees Fahrenheit")
+		else:
+			print("graph_vlabel degrees Celsius")
+		print("graph_category system")
+		
+		print("ambient.label ambient")
+		print("ambient.draw LINE2")
+		for i in range(1, len(temps)):
+			print "int" + str(i) + ".label sensor " + str(i)
+			print "int" + str(i) + ".draw LINE1"
+	else:
+		print "ambient.value " + str(temps[0])
+		for i in range(1, len(temps)):
+			print "int" + str(i) + ".value " + str(temps[i])
+
