@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+# 
+### LICENSE
+#
+# Copyright (c) 2012, Torsten Rehn <torsten@rehn.tel>
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above 
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# 
+### USAGE
+#
+# ln -s /usr/.../snmp__netapp_temp /etc/munin/plugins/snmp_10.11.12.13_netapp_temp
+#
+# vi /etc/munin/munin.conf
+# 	[netapp.example.com]
+# 		address 127.0.0.1
+# 		host_name netapp.example.com
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# 	[snmp_10.11.12.13_*]
+# 	host_name netapp.example.com
+# 	user root
+# 	env.community public
+#
+#%# family=auto
+#%# capabilities=autoconf
+
+from os import environ
+from re import match
+from subprocess import check_output
+from sys import argv, exit
+
+community = environ.get("community", "public")
+host = match(r"(.*)snmp_(?P<host>[^_]*)_(.*)", argv[0]).groupdict()["host"]
+
+config = (len(argv) == 2 and argv[1] == "config")
+
+def snmpget(*args):
+	oid = ".".join(args)
+	return check_output(
+		"snmpget -Oqv -v 2c -c {0} {1} {2}".format(
+			community,
+			host,
+			oid
+		),
+		shell = True
+	).strip().strip("\"")
+
+def parse_fans(input_string):
+	fans = input_string.split(",")
+	fans = [f.strip() for f in fans]
+	fans = [f.split()[0] for f in fans]
+	return map(int, fans)
+
+if len(argv) == 2 and argv[1] == "autoconfig":
+	print("yes")
+	exit(0)
+elif config:
+	print("host_name " + host)
+
+enc_ids = check_output(
+	"snmpwalk -Oqv -v 2c -c {0} {1} 1.3.6.1.4.1.789.1.21.1.2.1.1".format(
+		community,
+		host
+	),
+	shell = True
+).strip().split("\n")
+
+for enc_id in enc_ids:
+	oid_prefix = "1.3.6.1.4.1.789.1.21.1.2.1.62"
+
+	fans = parse_fans(snmpget(oid_prefix, enc_id))
+
+	print("multigraph fans_" + enc_id)
+	if config:
+		print("graph_title fan speeds for enclosure " + enc_id)
+		print("graph_args --slope-mode")
+		print("graph_vlabel RPM")
+		print("graph_category system")
+
+		for i in range(len(fans)):
+			print "fan" + str(i) + ".label fan " + str(i)
+			print "fan" + str(i) + ".draw LINE1"
+	else:
+		for i in range(len(fans)):
+			print "fan" + str(i) + ".value " + str(fans[i])
+
