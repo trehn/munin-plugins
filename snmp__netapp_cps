@@ -62,8 +62,8 @@ elif config:
     print("host_name " + host)
 
 oid_prefix = "1.3.6.1.4.1.789.1.2.6"
+print("multigraph cp_ops")
 if config:
-    print("multigraph cp_ops")
     print("graph_title consistency point operations")
     print("graph_args --slope-mode")
     print("graph_vlabel CPs/s")
@@ -115,8 +115,8 @@ else:
     print("back2backdef.value " + snmpget(oid_prefix, "12.0"))
     print("lowdvecs.value " + snmpget(oid_prefix, "13.0"))
 
+print("multigraph cp_ops_time")
 if config:
-    print("multigraph cp_ops_time")
     print("graph_title time spent on CP operations")
     print("graph_args --slope-mode")
     print("graph_vlabel percent")
