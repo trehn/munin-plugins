@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+# 
+### LICENSE
+#
+# Copyright (c) 2012, Torsten Rehn <torsten@rehn.tel>
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above 
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# 
+### USAGE
+#
+# ln -s /usr/.../snmp__netapp_cps /etc/munin/plugins/snmp_10.11.12.13_netapp_cps
+#
+# vi /etc/munin/munin.conf
+# 	[netapp.example.com]
+# 		address 127.0.0.1
+# 		host_name netapp.example.com
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# 	[snmp_10.11.12.13_*]
+# 	host_name netapp.example.com
+# 	user root
+# 	env.community public
+#
+#%# family=auto
+#%# capabilities=autoconf
+
+from os import environ
+from re import match
+from subprocess import check_output
+from sys import argv, exit
+
+community = environ.get("community", "public")
+host = match(r"(.*)snmp_(?P<host>[^_]*)_(.*)", argv[0]).groupdict()["host"]
+
+config = (len(argv) == 2 and argv[1] == "config")
+
+def snmpget(*args):
+    oid = ".".join(args)
+    return check_output(
+        "snmpget -Oqvt -v 2c -c {0} {1} {2}".format(
+            community,
+            host,
+            oid
+        ),
+        shell = True
+    ).strip().strip("\"")
+
+if len(argv) == 2 and argv[1] == "autoconfig":
+    print("yes")
+    exit(0)
+elif config:
+    print("host_name " + host)
+
+oid_prefix = "1.3.6.1.4.1.789.1.2.6"
+if config:
+    print("multigraph cp_ops")
+    print("graph_title consistency point operations")
+    print("graph_args --slope-mode")
+    print("graph_vlabel CPs/s")
+    print("graph_category disk")
+    
+    print("timer.label timer")
+    print("timer.type COUNTER")
+    print("timer.draw AREASTACK")
+    print("snapshot.label snapshot")
+    print("snapshot.type COUNTER")
+    print("snapshot.draw AREASTACK")
+    print("waterlow.label low water mark")
+    print("waterlow.type COUNTER")
+    print("waterlow.draw AREASTACK")
+    print("waterhigh.label high water mark")
+    print("waterhigh.type COUNTER")
+    print("waterhigh.draw AREASTACK")
+    print("logfull.label nv-log full")
+    print("logfull.type COUNTER")
+    print("logfull.draw AREASTACK")
+    print("back2back.label back to back")
+    print("back2back.type COUNTER")
+    print("back2back.draw AREASTACK")
+    print("flush.label flush unlogged write")
+    print("flush.type COUNTER")
+    print("flush.draw AREASTACK")
+    print("sync.label fs sync requests")
+    print("sync.type COUNTER")
+    print("sync.draw AREASTACK")
+    print("lowvbuf.label low virt buffer")
+    print("lowvbuf.type COUNTER")
+    print("lowvbuf.draw AREASTACK")
+    print("back2backdef.label back to back deferred")
+    print("back2backdef.type COUNTER")
+    print("back2backdef.draw AREASTACK")
+    print("lowdvecs.label low datavecs")
+    print("lowdvecs.type COUNTER")
+    print("lowdvecs.draw AREASTACK")
+else:
+    print("timer.value " + snmpget(oid_prefix, "2.0"))
+    print("snapshot.value " + snmpget(oid_prefix, "3.0"))
+    print("waterlow.value " + snmpget(oid_prefix, "4.0"))
+    print("waterhigh.value " + snmpget(oid_prefix, "5.0"))
+    print("logfull.value " + snmpget(oid_prefix, "6.0"))
+    print("back2back.value " + snmpget(oid_prefix, "7.0"))
+    print("flush.value " + snmpget(oid_prefix, "9.0"))
+    print("sync.value " + snmpget(oid_prefix, "10.0"))
+    print("lowvbuf.value " + snmpget(oid_prefix, "11.0"))
+    print("back2backdef.value " + snmpget(oid_prefix, "12.0"))
+    print("lowdvecs.value " + snmpget(oid_prefix, "13.0"))
+
+if config:
+    print("multigraph cp_ops_time")
+    print("graph_title time spent on CP operations")
+    print("graph_args --slope-mode")
+    print("graph_vlabel percent")
+    print("graph_category disk")
+    
+    print("cptime.label writing to disks")
+    print("cptime.type COUNTER")
+    print("cptime.draw AREA")
+else:
+    print("cptime.value " + snmpget(oid_prefix, "1.0"))
