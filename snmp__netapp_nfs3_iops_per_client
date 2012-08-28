@@ -101,7 +101,7 @@ for ip in client_ips:
     else:
         for i in range(len(BLOCK_SIZES)):
             size = BLOCK_SIZES[i]
-            opcount = snmpget(oid_prefix, str(i+107), ip)
+            opcount = snmpget(oid_prefix, str(i+108), ip)
             print("bs" + ip_safe + "_" + size + ".value " + opcount)
     
     # WRITES
@@ -120,5 +120,5 @@ for ip in client_ips:
     else:
         for i in range(len(BLOCK_SIZES)):
             size = BLOCK_SIZES[i]
-            opcount = snmpget(oid_prefix, str(i+116), ip)
+            opcount = snmpget(oid_prefix, str(i+117), ip)
             print("bs" + ip_safe + "_" + size + ".value " + opcount)
