@@ -1,0 +1,265 @@
+#!/usr/bin/env python
+#
+### LICENSE
+#
+# Copyright (c) 2013, Torsten Rehn <torsten@rehn.tel>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+### USAGE
+#
+# pip install requests
+#
+# ln -s /usr/.../zendesk /etc/munin/plugins/zendesk
+#
+# vi /etc/munin/munin.conf
+# [zendesk]
+# address 127.0.0.1
+# host_name zendesk
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# [zendesk]
+# host_name zendesk
+# timeout 60
+# env.subdomain acme
+# env.email jdoe@example.com
+# env.password sW0Rdf15H
+# env.views 123456789, 987654321
+#
+
+from __future__ import unicode_literals
+
+from os import environ
+from os.path import exists
+from sys import argv, exit
+from time import time
+
+from requests import get
+from requests.auth import HTTPBasicAuth
+
+# get settings from environment
+
+try:
+    SUBDOMAIN = environ['subdomain']
+    USER_EMAIL = environ['email']
+    USER_PASSWORD = environ['password']
+    VIEWS = environ['views']
+except KeyError:
+    print("Please configure the following environment variables in Munin: "
+          "subdomain, email, password, views")
+    exit(1)
+
+# utilities
+
+BASE_URL = "https://{}.zendesk.com/api/v2/".format(SUBDOMAIN)
+
+def api_call(urlpath):
+    return get(
+        BASE_URL + urlpath,
+        auth=HTTPBasicAuth(USER_EMAIL, USER_PASSWORD),
+    ).json()
+
+def cached_property(prop):
+    def cache_wrapper(self):
+        if not hasattr(self, "_cache"):
+            self._cache = {}
+        if not prop in self._cache:
+            self._cache[prop] = prop(self)
+        return self._cache[prop]
+    return property(cache_wrapper)
+
+class View(object):
+    def __init__(self, view_id):
+        self.tickets = []
+        self.view_id = view_id
+        self._title = None
+
+    def add_tickets(self, tickets):
+        self.tickets = tickets
+
+    def number_of_tickets_not_in(self, compare_view):
+        t = 0
+        for ticket in self.tickets:
+            if ticket not in compare_view.tickets:
+                t += 1
+        return t
+
+    @cached_property
+    def title(self):
+        return api_call(
+            "views/{}.json".format(self.view_id)
+        )['view']['title']
+
+class Cache(object):
+    FILE_PATH = "/tmp/munin_plugin_zendesk.cache"
+
+    def __init__(self):
+        try:
+            with open(self.FILE_PATH, 'a') as f:
+                f.write("")
+        except IOError as e:
+            print("Unable to write to {}".format(self.FILE_PATH))
+            exit(1)
+
+        with open(self.FILE_PATH) as f:
+            lines = f.readlines()
+
+        self.cached_views = {}
+        for line in lines:
+            if not line.strip():
+                continue
+            view_id = line.split(":")[0]
+            view = View(view_id)
+            tickets = line.split(":")[1].strip().split(",")
+            view.add_tickets(tickets)
+            self.cached_views[view_id] = view
+
+    def write(self):
+        with open(self.FILE_PATH, 'w') as f:
+            for view in self.cached_views.values():
+                f.write("{}:{}\n".format(
+                    view.view_id,
+                    ",".join(view.tickets),
+                ))
+
+# handle Munin command line arguments
+
+config = (len(argv) == 2 and argv[1] == "config")
+
+# fetch and process data
+
+cache = Cache()
+
+view_ids = []
+for view_id in [id.strip() for id in VIEWS.split(",")]:
+    if view_id:
+        view_ids.append(view_id)
+
+views = []
+for view_id in view_ids:
+    tickets = [str(ticket['id']) for ticket in api_call(
+        "views/{}/tickets.json".format(view_id),
+    )['tickets']]
+    view = View(view_id)
+    view.add_tickets(tickets)
+    views.append(view)
+
+# munin output: ticket activity
+
+print("multigraph zendesk_ticket_activity_per_view")
+if config:
+    print("graph_title tickets added/removed per view")
+    print("graph_args --slope-mode --lower-limit 0")
+    print("graph_vlabel tickets per second")
+    print("graph_category helpdesk")
+
+    for view in views:
+        print("view{0}removed.label {0}".format(view.view_id))
+        print("view{}removed.graph no".format(view.view_id))
+        print("view{}removed.type ABSOLUTE".format(view.view_id))
+
+        print("view{}added.label {}".format(
+            view.view_id,
+            view.title,
+        ).encode('utf-8'))
+        print("view{}added.draw LINE1".format(view.view_id))
+        print("view{}added.type ABSOLUTE".format(view.view_id))
+        print("view{0}added.negative view{0}removed".format(view.view_id))
+else:
+    for view in views:
+        try:
+            cached_view = cache.cached_views[view.view_id]
+            print('view{}removed.value {}'.format(
+                view.view_id,
+                cached_view.number_of_tickets_not_in(view),
+            ))
+            print('view{}added.value {}'.format(
+                view.view_id,
+                view.number_of_tickets_not_in(cached_view),
+            ))
+        except KeyError:
+            print('view{}removed.value 0'.format(
+                view.view_id,
+            ))
+            print('view{}added.value 0'.format(
+                view.view_id,
+            ))
+
+for view in views:
+    print("multigraph zendesk_ticket_activity_per_view.{}".format(view.view_id))
+    if config:
+        print("graph_title {}".format(view.title).encode('utf-8'))
+        print("graph_args --slope-mode --lower-limit 0")
+        print("graph_vlabel tickets per second")
+        print("graph_category helpdesk")
+
+        print("removed.label hidden")
+        print("removed.graph no")
+        print("removed.type ABSOLUTE")
+
+        print("added.label ticket activity")
+        print("added.type ABSOLUTE")
+        print("added.negative view_removed")
+    else:
+        try:
+            cached_view = cache.cached_views[view.view_id]
+            print("removed.value {}".format(
+                cached_view.number_of_tickets_not_in(view),
+            ))
+            print("added.value {}".format(
+                view.number_of_tickets_not_in(cached_view),
+            ))
+        except KeyError:
+            # no view cached
+            print("removed.value 0")
+            print("added.value 0")
+
+# munin output: ticket counts
+
+print("multigraph zendesk_tickets_per_view")
+if config:
+    print("graph_title total tickets per view")
+    print("graph_args --slope-mode --lower-limit 0")
+    print("graph_vlabel tickets")
+    print("graph_category helpdesk")
+
+    for view in views:
+        print('view{}.label {}'.format(
+            view.view_id,
+            view.title,
+        ).encode('utf-8'))
+        print('view{}.draw AREASTACK'.format(view.view_id))
+else:
+    for view in views:
+        print('view{}.value {}'.format(view.view_id, len(view.tickets)))
+
+for view in views:
+    print("multigraph zendesk_tickets_per_view.{}".format(view.view_id))
+    if config:
+        print("graph_title {}".format(view.title).encode('utf-8'))
+        print("graph_args --slope-mode --lower-limit 0")
+        print("graph_vlabel tickets")
+        print("graph_category helpdesk")
+
+        print('tickets.draw AREA')
+        print('tickets.label tickets')
+    else:
+        print('tickets.value {}'.format(len(view.tickets)))
+
+# update cache with current values
+
+if not config:
+    cache.cached_views = {}
+    for view in views:
+        cache.cached_views[view.view_id] = view
+    cache.write()
