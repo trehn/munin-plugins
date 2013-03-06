@@ -1,3 +1,5 @@
+Licenses and usage instructions are found inside the individual plugin files.
+
 `snmp__netapp_*`
 ================
 
