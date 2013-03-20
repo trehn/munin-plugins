@@ -61,11 +61,13 @@ except KeyError:
 
 BASE_URL = "https://{}.zendesk.com/api/v2/".format(SUBDOMAIN)
 
+
 def api_call(urlpath):
     return get(
         BASE_URL + urlpath,
         auth=HTTPBasicAuth(USER_EMAIL, USER_PASSWORD),
     ).json()
+
 
 def cached_property(prop):
     def cache_wrapper(self):
@@ -75,6 +77,7 @@ def cached_property(prop):
             self._cache[prop] = prop(self)
         return self._cache[prop]
     return property(cache_wrapper)
+
 
 class View(object):
     def __init__(self, view_id):
@@ -98,6 +101,7 @@ class View(object):
             "views/{}.json".format(self.view_id)
         )['view']['title']
 
+
 class Cache(object):
     FILE_PATH = "/tmp/munin_plugin_zendesk.cache"
 
@@ -105,7 +109,7 @@ class Cache(object):
         try:
             with open(self.FILE_PATH, 'a') as f:
                 f.write("")
-        except IOError as e:
+        except IOError:
             print("Unable to write to {}".format(self.FILE_PATH))
             exit(1)
 
