@@ -86,7 +86,7 @@ class View(object):
         self._title = None
 
     def add_tickets(self, tickets):
-        self.tickets = tickets
+        self.tickets += tickets
 
     def number_of_tickets_not_in(self, compare_view):
         t = 0
@@ -149,11 +149,18 @@ for view_id in [id.strip() for id in VIEWS.split(",")]:
 
 views = []
 for view_id in view_ids:
-    tickets = [str(ticket['id']) for ticket in api_call(
-        "views/{}/tickets.json".format(view_id),
-    )['tickets']]
     view = View(view_id)
-    view.add_tickets(tickets)
+    page = 1
+    while page:
+        result = api_call(
+            "views/{}/tickets.json?page={}".format(view_id, page),
+        )
+        tickets = [str(ticket['id']) for ticket in result['tickets']]
+        view.add_tickets(tickets)
+        if result['next_page']:
+            page += 1
+        else:
+            page = False
     views.append(view)
 
 # munin output: ticket activity
