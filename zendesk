@@ -40,9 +40,7 @@
 from __future__ import unicode_literals
 
 from os import environ
-from os.path import exists
 from sys import argv, exit
-from time import time
 
 from requests import get
 from requests.auth import HTTPBasicAuth
