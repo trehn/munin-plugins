@@ -1,0 +1,156 @@
+#!/usr/bin/env python
+#
+### LICENSE
+#
+# Copyright (c) 2013, Torsten Rehn <torsten@rehn.tel>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+### USAGE
+#
+# on NetApp filer:
+#
+# useradmin role add monitoring -a login-http-admin,api-perf-*
+# useradmin group add monitoring_systems -r monitoring
+# useradmin user add munin -g monitoring_systems
+#
+# on Munin host:
+#
+# pip install requests
+#
+# ln -s /usr/.../netapp_diskutil_ /etc/munin/plugins/netapp_diskutil_10.1.2.3
+#
+# vi /etc/munin/munin.conf
+# [my.netapp.example.com]
+# address 127.0.0.1
+# host_name my.netapp.example.com
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# [netapp_diskutil_10.1.2.3]
+# host_name my.netapp.example.com
+# timeout 60
+# env.api_user munin
+# env.api_pass sW0Rdf15H
+#
+# restart munin-node
+#
+
+from os import environ
+from re import match
+from sys import argv
+from time import sleep
+from xml.etree import ElementTree
+
+import requests
+
+URL = "https://{}/servlets/netapp.servlets.admin.XMLrequest_filer".format(
+    match(r'(.*)netapp_diskutil_(?P<ip>.*)', argv[0]).groupdict()['ip']
+)
+USER = environ.get('api_user', "munin")
+PASS = environ.get('api_pass', "")
+
+INTERVALS = (1, 5, 20)
+
+XML_REQUEST_BODY = """<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE netapp SYSTEM 'file:/etc/netapp_filer.dtd'>
+<netapp version="1.0" xmlns="http://www.netapp.com/filer/admin">
+    <perf-object-get-instances>
+        <objectname>disk</objectname>
+        <counters>
+            <counter>raid_type</counter>
+            <counter>disk_busy</counter>
+            <counter>base_for_disk_busy</counter>
+        </counters>
+    </perf-object-get-instances>
+</netapp>"""
+
+config = (len(argv) == 2 and argv[1] == "config")
+
+
+def get_disk_stats():
+    r = requests.post(
+        URL,
+        verify=False,
+        auth=(USER, PASS),
+        headers={"Content-type": "text/xml; charset=\"UTF-8\""},
+        data=XML_REQUEST_BODY,
+    )
+
+    xml = ElementTree.fromstring(r.text)
+
+    disks = {}
+
+    for disk in xml[0][1]:
+        disk_id = disk[0].text
+        counters = disk[1]
+        disks[disk_id] = {}
+        for counter in counters:
+            disks[disk_id][counter[0].text] = counter[1].text
+
+    for disk_id in list(disks.keys()):
+        if disks[disk_id]['raid_type'] != "data":
+            del disks[disk_id]
+
+    return disks
+
+if config:
+    for interval in INTERVALS:
+        print("multigraph disk_utilization_{:0>5}".format(interval))
+        print("graph_title disk utilization ({} second average)"
+              "".format(interval))
+        print("graph_args --slope-mode -l 0 -u 100 -r")
+        print("graph_vlabel percent")
+        print("graph_category disk")
+        print("graph_info Shows percentage of time during which data disks "
+              "have pending IO requests over an interval of {} seconds."
+              "".format(interval))
+        print("max.draw LINE2")
+        print("max.label most active disk")
+        print("max.colour e64b4b")
+        print("avg.draw LINE1")
+        print("avg.label average (all disks)")
+        print("avg.colour afafaf")
+        print("min.draw LINE1")
+        print("min.label least active disk")
+        print("min.colour 7fe74b")
+
+else:
+    all_stats = {}
+    all_stats[0] = get_disk_stats()
+
+    prev_interval = 0
+    for interval in INTERVALS:
+        sleep(interval - prev_interval)
+        prev_interval = interval
+        all_stats[interval] = get_disk_stats()
+
+    for interval, stats in all_stats.items():
+        if interval == 0:
+            continue
+
+        per_disk_values = []
+
+        for disk_id in stats:
+            busy_diff = int(stats[disk_id]['disk_busy']) - \
+                int(all_stats[0][disk_id]['disk_busy'])
+            time_diff = int(stats[disk_id]['base_for_disk_busy']) - \
+                int(all_stats[0][disk_id]['base_for_disk_busy'])
+            if busy_diff < 0 or time_diff < 0:
+                raise Exception("counters wrapped around, bailing out")
+            per_disk_values.append(100 * busy_diff / time_diff)
+
+        print("multigraph disk_utilization_{:0>5}".format(interval))
+        print("max.value {}".format(max(per_disk_values)))
+        print("avg.value {}".format(sum(per_disk_values) /
+                                    float(len(per_disk_values))))
+        print("min.value {}".format(min(per_disk_values)))
