@@ -1,5 +1,10 @@
 Licenses and usage instructions are found inside the individual plugin files.
 
+`netapp_diskutil_`
+==================
+
+![netapp_diskutil_](https://github.com/trehn/munin-plugins/raw/master/screenshots/netapp_diskutil_.png)
+
 `snmp__netapp_*`
 ================
 
