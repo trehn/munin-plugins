@@ -60,7 +60,7 @@ def snmpget(*args):
 
 def parse_temp(input_string):
 	temps = input_string.split(",")
-	temps = [t.strip() for t in temps]
+	temps = [t.strip() for t in temps if '<N/A>' not in t]
 	if unit == "F":
 		temps = [t.split()[1].rstrip(")").lstrip("(").rstrip("F") for t in temps]
 	else:
