@@ -1,0 +1,198 @@
+#!/usr/bin/env python
+#
+### LICENSE
+#
+# Copyright (c) 2013, Torsten Rehn <torsten@rehn.tel>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+### USAGE
+#
+# on XenServer:
+#
+# useradd munin; passwd munin
+#
+# on Munin host:
+#
+# aptitude install python-xenapi
+#
+# vi /etc/munin/plugin-conf.d/munin-node
+# [my_virtual_xenserver_host]
+# host_name example.com
+# timeout 60
+# env.xapi_url http://example.com
+# env.xapi_user munin
+# env.xapi_pass sW0Rdf15H
+#
+from datetime import datetime
+from os import environ
+from sys import argv
+
+from XenAPI import Session
+
+
+URL = environ.get('xapi_url', "http://localhost")
+USER = environ.get('xapi_user', "munin")
+PASS = environ.get('xapi_pass', "")
+
+
+class XenAPISession(object):
+    def __enter__(self):
+        self.s = Session(URL)
+        self.s.xenapi.login_with_password(USER, PASS)
+        return self.s
+
+    def __exit__(self, type, value, traceback):
+        self.s.xenapi.logout()
+
+
+def ram_usage_config():
+    print(
+        "multigraph ram_usage\n"
+        "graph_title RAM usage\n"
+        "graph_args --slope-mode -l 0\n"
+        "graph_vlabel GB\n"
+        "graph_category virtualization\n"
+        "total.draw AREA\n"
+        "total.label total\n"
+        "total.colour 00dd00\n"
+        "used.draw AREA\n"
+        "used.label used\n"
+        "used.colour dd0000\n"
+        "free.draw LINE0\n"
+        "free.label free\n"
+        "free.colour 00dd00\n"
+    )
+    for host_record in hosts.values():
+        print(
+            "multigraph ram_usage.{}\n"
+            "graph_title RAM usage for {}\n"
+            "graph_args --slope-mode -l 0\n"
+            "graph_vlabel GB\n"
+            "graph_category virtualization\n"
+            "total.draw AREA\n"
+            "total.label total\n"
+            "total.colour 00dd00\n"
+            "used.draw AREA\n"
+            "used.label used\n"
+            "used.colour dd0000\n"
+            "free.draw LINE0\n"
+            "free.label free\n"
+            "free.colour 00dd00\n".format(
+                host_record["uuid"],
+                host_record["name_label"],
+            )
+        )
+
+
+def ram_usage_values():
+    print("multigraph ram_usage")
+    free = 0.0
+    total = 0.0
+    for metric_record in host_metrics.values():
+        free += float(metric_record["memory_free"]) / 1073741824.0
+        total += float(metric_record["memory_total"]) / 1073741824.0
+    used = total - free
+
+    print("total.value {}".format(total))
+    print("used.value {}".format(used))
+    print("free.value {}".format(free))
+
+    for host_opref, host_record in hosts.iteritems():
+        print("multigraph ram_usage.{}".format(host_record["uuid"]))
+
+        free = float(host_metrics[host_opref]["memory_free"]) / 1073741824.0
+        total = float(host_metrics[host_opref]["memory_total"]) / 1073741824.0
+        used = total - free
+
+        print("total.value {}".format(total))
+        print("used.value {}".format(used))
+        print("free.value {}".format(free))
+
+
+def vm_uptime_config():
+    print(
+        "multigraph vm_uptime\n"
+        "graph_title VM uptime\n"
+        "graph_args --slope-mode -l 0\n"
+        "graph_vlabel days\n"
+        "graph_category virtualization\n"
+        "max.draw LINE2\n"
+        "max.label max\n"
+        "max.colour dd0000\n"
+        "avg.draw LINE2\n"
+        "avg.label average\n"
+        "avg.colour 0000dd\n"
+        "min.draw LINE2\n"
+        "min.label min\n"
+        "min.colour 00dd00\n"
+    )
+
+
+def vm_uptime_values():
+    print("multigraph vm_uptime")
+    now = datetime.utcnow()
+    uptime_max = 0.0
+    uptime_min = 99999.9
+    uptime_total = 0.0
+
+    for vm_opref, vm_record in vms.iteritems():
+        metric_record = vm_metrics[vm_opref]
+        start_time = datetime.strptime(
+            metric_record["start_time"].value,
+            "%Y%m%dT%H:%M:%SZ",
+        )
+        uptime = now - start_time
+        uptime_days = uptime.total_seconds() / 86400.0
+        if uptime_days > uptime_max:
+            uptime_max = uptime_days
+        if uptime_days < uptime_min:
+            uptime_min = uptime_days
+        uptime_total += uptime_days
+
+    uptime_average = uptime_total / len(vms)
+
+    print("max.value {}".format(uptime_max))
+    print("avg.value {}".format(uptime_average))
+    print("min.value {}".format(uptime_min))
+
+
+if __name__ == '__main__':
+    vms = {}
+    vm_metrics = {}
+    hosts = {}
+    host_metrics = {}
+
+    with XenAPISession() as session:
+        for vm_opref in session.xenapi.VM.get_all():
+                vm_record = session.xenapi.VM.get_record(vm_opref)
+                if vm_record["power_state"] != "Running" or \
+                        vm_record["is_control_domain"] is True:
+                    continue
+                vms[vm_opref] = vm_record
+                metric_opref = vms[vm_opref]["metrics"]
+                vm_metrics[vm_opref] = \
+                    session.xenapi.VM_metrics.get_record(metric_opref)
+
+        for host_opref in session.xenapi.host.get_all():
+                hosts[host_opref] = session.xenapi.host.get_record(host_opref)
+                metric_opref = hosts[host_opref]["metrics"]
+                host_metrics[host_opref] = \
+                    session.xenapi.host_metrics.get_record(metric_opref)
+
+    if len(argv) == 2 and argv[1] == "config":
+        ram_usage_config()
+        vm_uptime_config()
+    else:
+        ram_usage_values()
+        vm_uptime_values()
