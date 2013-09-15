@@ -107,6 +107,7 @@ def ram_usage_values():
     print("total.value {}".format(total))
     print("used.value {}".format(used))
     print("free.value {}".format(free))
+    print("")
 
     for host_opref, host_record in hosts.iteritems():
         print("multigraph ram_usage.{}".format(host_record["uuid"]))
@@ -118,6 +119,7 @@ def ram_usage_values():
         print("total.value {}".format(total))
         print("used.value {}".format(used))
         print("free.value {}".format(free))
+        print("")
 
 
 def vm_count_config():
@@ -152,6 +154,7 @@ def vm_count_values():
             host_record["uuid"],
             len(real_vms),
         ))
+    print("")
 
 
 def vm_uptime_config():
@@ -199,6 +202,7 @@ def vm_uptime_values():
     print("max.value {}".format(uptime_max))
     print("avg.value {}".format(uptime_average))
     print("min.value {}".format(uptime_min))
+    print("")
 
 
 if __name__ == '__main__':
