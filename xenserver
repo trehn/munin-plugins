@@ -89,7 +89,7 @@ def ram_usage_config():
             "free.draw LINE0\n"
             "free.label free\n"
             "free.colour 00dd00\n".format(
-                host_record["uuid"],
+                host_record["uuid"].replace("-", ""),
                 host_record["name_label"],
             )
         )
@@ -110,7 +110,7 @@ def ram_usage_values():
     print("")
 
     for host_opref, host_record in hosts.iteritems():
-        print("multigraph ram_usage.{}".format(host_record["uuid"]))
+        print("multigraph ram_usage.{}".format(host_record["uuid"].replace("-", "")))
 
         free = float(host_metrics[host_opref]["memory_free"]) / 1073741824.0
         total = float(host_metrics[host_opref]["memory_total"]) / 1073741824.0
@@ -137,7 +137,7 @@ def vm_count_config():
         print(
             "{0}.draw AREASTACK\n"
             "{0}.label {1}".format(
-                host_record["uuid"],
+                host_record["uuid"].replace("-", ""),
                 host_record["name_label"],
             )
         )
@@ -151,7 +151,7 @@ def vm_count_values():
         real_vms = [vm_opref for vm_opref in host_record["resident_VMs"]
                     if vm_opref in vms.keys()]
         print("{}.value {}".format(
-            host_record["uuid"],
+            host_record["uuid"].replace("-", ""),
             len(real_vms),
         ))
     print("")
