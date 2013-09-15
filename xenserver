@@ -120,6 +120,40 @@ def ram_usage_values():
         print("free.value {}".format(free))
 
 
+def vm_count_config():
+    print(
+        "multigraph vm_count\n"
+        "graph_title VM count\n"
+        "graph_args --slope-mode -l 0\n"
+        "graph_vlabel virtual machines\n"
+        "graph_category virtualization\n"
+        "total.draw LINE0\n"
+        "total.label total\n"
+        "total.colour ffffff"
+    )
+    for host_record in hosts.values():
+        print(
+            "{0}.draw AREASTACK\n"
+            "{0}.label {1}".format(
+                host_record["uuid"],
+                host_record["name_label"],
+            )
+        )
+    print("")
+
+
+def vm_count_values():
+    print("multigraph vm_count")
+    print("total.value {}".format(len(vms)))
+    for host_record in hosts.values():
+        real_vms = [vm_opref for vm_opref in host_record["resident_VMs"]
+                    if vm_opref in vms.keys()]
+        print("{}.value {}".format(
+            host_record["uuid"],
+            len(real_vms),
+        ))
+
+
 def vm_uptime_config():
     print(
         "multigraph vm_uptime\n"
@@ -192,7 +226,9 @@ if __name__ == '__main__':
 
     if len(argv) == 2 and argv[1] == "config":
         ram_usage_config()
+        vm_count_config()
         vm_uptime_config()
     else:
         ram_usage_values()
+        vm_count_values()
         vm_uptime_values()
