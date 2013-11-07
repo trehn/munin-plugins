@@ -19,6 +19,13 @@ Licenses and usage instructions are found inside the individual plugin files.
 ![snmp__netapp_nfs3_ops](https://github.com/trehn/munin-plugins/raw/master/screenshots/snmp__netapp_nfs3_ops.png)
 ![snmp__netapp_temp](https://github.com/trehn/munin-plugins/raw/master/screenshots/snmp__netapp_temp.png)
 
+`xenserver`
+=========
+
+![xenserver1](https://github.com/trehn/munin-plugins/raw/master/screenshots/xenserver1.png)
+![xenserver2](https://github.com/trehn/munin-plugins/raw/master/screenshots/xenserver2.png)
+![xenserver3](https://github.com/trehn/munin-plugins/raw/master/screenshots/xenserver3.png)
+
 `zendesk`
 =========
 
