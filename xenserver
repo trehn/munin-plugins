@@ -197,6 +197,25 @@ def cpu_usage_config():
         print("host_{}.draw LINE1".format(uuid))
         print("")
 
+    print(
+        "multigraph cpu_usage_average_deviation\n"
+        "graph_title CPU usage imbalance\n"
+        "graph_args --slope-mode\n"
+        "graph_info Shows how much the CPU usage on each server deviates from the pool average. Example: a server with 65% CPU usage in a pool with a 50% average will show as 15% in this graph. Negative values indicate the server is handling less load than the pool average.\n"
+        "graph_vlabel %\n"
+        "graph_category virtualization"
+    )
+    for name, uuid in sorted([
+        (host_record["name_label"], host_record["uuid"].replace("-", ""))
+        for host_record in hosts.values()
+    ]):
+        print("host_{}.label {}".format(
+            uuid,
+            name,
+        ))
+        print("host_{}.draw LINE1".format(uuid))
+        print("")
+
     for host_record in hosts.values():
         print(
             "multigraph cpu_usage.{}\n"
@@ -240,13 +259,20 @@ def cpu_usage_values():
     for host_record in hosts.values():
         number_of_hosts += 1
         total_utilisation += host_cpu_usage[host_record["uuid"]][0]
-    print("average.value {}".format(
-            total_utilisation * 100 / number_of_hosts
-    ))
+    average_utilisation = total_utilisation * 100 / number_of_hosts
+    print("average.value {}".format(average_utilisation))
     for host_record in hosts.values():
         print("host_{}.value {}".format(
             host_record["uuid"].replace("-", ""),
             int(host_cpu_usage[host_record["uuid"]][0] * 100),
+        ))
+    print("")
+
+    print("multigraph cpu_usage_average_deviation")
+    for host_opref, host_record in hosts.items():
+        print("host_{}.value {}".format(
+            host_record["uuid"].replace("-", ""),
+            int(host_cpu_usage[host_record["uuid"]][0] * 100.0 - average_utilisation),
         ))
     print("")
 
