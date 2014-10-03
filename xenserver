@@ -151,6 +151,7 @@ def cpu_allocation_values():
 
     print("multigraph cpu_overcommitment_factor")
     print("vcpus.value {0:.2f}".format(float(vcpuassigned) / float(physical)))
+    print("")
 
     for host_opref, host_record in hosts.items():
         print("multigraph cpu_allocation.{}".format(host_record["uuid"].replace("-", "")))
@@ -172,6 +173,7 @@ def cpu_allocation_values():
 
         print("multigraph cpu_overcommitment_factor.{}".format(host_record["uuid"].replace("-", "")))
         print("vcpus.value {0:.2f}".format(float(vcpuassigned) / float(physical)))
+        print("")
 
 
 def cpu_usage_config():
@@ -241,7 +243,7 @@ def cpu_usage_values():
             host_record["uuid"].replace("-", ""),
             int(host_cpu_usage[host_record["uuid"]][0] * 100),
         ))
-        print("")
+    print("")
 
     for host_opref, host_record in hosts.items():
         print("multigraph cpu_usage.{}".format(host_record["uuid"].replace("-", "")))
