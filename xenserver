@@ -195,7 +195,7 @@ def cpu_usage_config():
             name,
         ))
         print("host_{}.draw LINE1".format(uuid))
-        print("")
+    print("")
 
     print(
         "multigraph cpu_usage_average_deviation\n"
@@ -214,7 +214,7 @@ def cpu_usage_config():
             name,
         ))
         print("host_{}.draw LINE1".format(uuid))
-        print("")
+    print("")
 
     for host_record in hosts.values():
         print(
