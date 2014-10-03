@@ -234,11 +234,6 @@ def cpu_usage_config():
 def cpu_usage_values():
     print("multigraph cpu_usage")
     for host_record in hosts.values():
-        number_of_cores = 0
-        total_utilisation = 0.0
-        for core_number, utilisation in host_cpu_usage[host_record["uuid"]].items():
-            number_of_cores += 1
-            total_utilisation += utilisation
         print("host_{}.value {}".format(
             host_record["uuid"].replace("-", ""),
             int(host_cpu_usage[host_record["uuid"]][0] * 100),
