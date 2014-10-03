@@ -205,6 +205,9 @@ def cpu_usage_config():
         "graph_vlabel %\n"
         "graph_category virtualization"
     )
+    print("baseline.label pool average (baseline)")
+    print("baseline.colour 000000")
+    print("baseline.draw LINE3")
     for name, uuid in sorted([
         (host_record["name_label"], host_record["uuid"].replace("-", ""))
         for host_record in hosts.values()
@@ -269,6 +272,7 @@ def cpu_usage_values():
     print("")
 
     print("multigraph cpu_usage_average_deviation")
+    print("baseline.value 0")
     for host_opref, host_record in hosts.items():
         print("host_{}.value {}".format(
             host_record["uuid"].replace("-", ""),
