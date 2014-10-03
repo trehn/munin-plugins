@@ -184,6 +184,8 @@ def cpu_usage_config():
         "graph_vlabel %\n"
         "graph_category virtualization"
     )
+    print("average.label average")
+    print("average.draw LINE3")
     for name, uuid in sorted([
         (host_record["name_label"], host_record["uuid"].replace("-", ""))
         for host_record in hosts.values()
@@ -233,6 +235,14 @@ def cpu_usage_config():
 
 def cpu_usage_values():
     print("multigraph cpu_usage")
+    number_of_hosts = 0
+    total_utilisation = 0.0
+    for host_record in hosts.values():
+        number_of_hosts += 1
+        total_utilisation += host_cpu_usage[host_record["uuid"]][0]
+    print("average.value {}".format(
+            total_utilisation * 100 / number_of_hosts
+    ))
     for host_record in hosts.values():
         print("host_{}.value {}".format(
             host_record["uuid"].replace("-", ""),
