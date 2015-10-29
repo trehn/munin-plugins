@@ -57,7 +57,7 @@ def snmpget(*args):
 
 def parse_fans(input_string):
 	fans = input_string.split(",")
-	fans = [f.strip() for f in fans]
+	fans = [f.strip() for f in fans if '<N/A>' not in f]
 	fans = [f.split()[0] for f in fans]
 	return map(int, fans)
 
@@ -89,7 +89,7 @@ for enc_id in enc_ids:
 
 		for i in range(len(fans)):
 			print("fan" + str(i) + ".label fan " + str(i+1))
-			print("fan" + str(i) + ".draw LINE1"
+			print("fan" + str(i) + ".draw LINE1")
 	else:
 		for i in range(len(fans)):
 			print("fan" + str(i) + ".value " + str(fans[i]))

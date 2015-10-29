@@ -57,7 +57,7 @@ def snmpget(*args):
 
 def parse_currents(input_string):
 	currents = input_string.split(",")
-	currents = [c.strip() for c in currents]
+	currents = [c.strip() for c in currents if '<N/A>' not in c]
 	currents = [c.split()[0] for c in currents]
 	currents = map(int, currents)
 	currents = [c / 1000.0 for c in currents]
