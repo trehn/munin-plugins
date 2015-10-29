@@ -89,7 +89,7 @@ for enc_id in enc_ids:
 
 		for i in range(len(fans)):
 			print("fan" + str(i) + ".label fan " + str(i+1))
-			print("fan" + str(i) + ".draw LINE1"
+			print("fan" + str(i) + ".draw LINE1")
 	else:
 		for i in range(len(fans)):
 			print("fan" + str(i) + ".value " + str(fans[i]))
